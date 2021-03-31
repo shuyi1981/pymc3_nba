@@ -22,6 +22,6 @@ Using PYMC3 to model NBA matches
 
 
 #### others
-benchmark: results from a model with one intercept (dummy) per player (not bayesian) 
-out_of_training.ipynb: notebook showing what happens if you include a player that wasn't seen in training
+* benchmark: results from a model with one intercept (dummy) per player (not bayesian) 
+* out_of_training.ipynb: notebook showing what happens if you include a player that wasn't seen in training
 
