@@ -10,16 +10,18 @@ Using PYMC3 to model NBA matches
 * parse_seasonal_games.py: all games from the season
 * parse_odds.py: write clean csv with odds
 ----
-### Model
+### Model and test
 * shared_reg: feature engineering + bayesian model
 * odds: calculate return on test data using odds.
-
+----
 ### Predict live matches
+* get_daily_lineup.py: expected lineup per game
+* parse_game_lineup.py: write clean csv with lineups
+* predict_one: predict one particular game
+* predict_batch: predict all matches for selected dates
 
 
 #### others
 benchmark: results from a model with one intercept (dummy) per player (not bayesian) 
 out_of_training.ipynb: notebook showing what happens if you include a player that wasn't seen in training
-predict_one: predict one particular game
-predict_batch: predict all matches for selected dates
 
