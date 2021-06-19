@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import pickle
+import arrow  # for dates
+import datetime
 
 
 def get_player_index(daily_gamelog):
@@ -10,7 +12,8 @@ def get_player_index(daily_gamelog):
     - num_players : # of unique players 
     """
     players = daily_gamelog.playerId.unique()
-    last_name = daily_gamelog[['playerId', 'lastName']].drop_duplicates()
+    last_name = daily_gamelog[['playerId', 'lastName']
+                              ].drop_duplicates('playerId')
     players = pd.DataFrame(players, columns=['playerId'])
     players["i"] = players.index
     players = players.merge(last_name, on="playerId", how="left")
@@ -26,7 +29,7 @@ def get_team_index(daily_gamelog):
     - num_teams : # of unique teams 
     """
     teams = daily_gamelog.teamId.unique()
-    abb = daily_gamelog[['teamId', 'abbreviation']].drop_duplicates()
+    abb = daily_gamelog.loc[:, ['teamId', 'abbreviation']].drop_duplicates()
     teams = pd.DataFrame(teams, columns=['teamId'])
     teams["teamI"] = teams.index
     teams = teams.merge(abb, on="teamId", how="left")
@@ -126,10 +129,14 @@ def clean_data_1(daily_gamelog):
     Flag if playing at home
     """
     daily_gamelog = daily_gamelog[daily_gamelog['minSeconds'] > 0.0]
-    daily_gamelog['pts_minute'] = daily_gamelog['pts'] / \
-        daily_gamelog['minSeconds']*60
+    daily_gamelog['pts_minute'] = daily_gamelog.loc[:, 'pts'] / \
+        daily_gamelog.loc[:, 'minSeconds']*60
     daily_gamelog['atHome'] = np.where(
-        daily_gamelog['abbreviation'] == daily_gamelog['homeTeamAbbreviation'], 1, 0)
+        daily_gamelog.loc[:, 'abbreviation'] == daily_gamelog['homeTeamAbbreviation'], 1, 0)
+    # From string to arrow datetime
+    daily_gamelog['startTime_date'] = daily_gamelog.apply(
+        lambda row: arrow.get(row['startTime']), axis=1)
+    daily_gamelog = daily_gamelog.drop_duplicates(['gameId', 'playerId'])
     return daily_gamelog
 
 
@@ -159,13 +166,38 @@ def feature_engineer_1(daily_gamelog, teams):
     # Add opponent team Index
     daily_gamelog = pd.merge(daily_gamelog, teams.drop(
         columns="abbreviation").rename(columns={'teamI': 'oppTeamI', 'teamId':  'oppTeamId'}), on="oppTeamId", how="left")
+
+    # Add resting hours from previous game
+    daily_gamelog = daily_gamelog.sort_values(
+        by=['playerId', 'startTime_date'])
+
+    # Difference between games (timedelta type in days)
+    daily_gamelog['diff_days'] = daily_gamelog.groupby(
+        'playerId').startTime_date.diff()
+    # Filling NA for players with just one match because it would break because of type NaN
+    daily_gamelog['diff_days'] = daily_gamelog['diff_days'].fillna(
+        datetime.timedelta(3))
+    # timeldet in days  transformed to hours
+    daily_gamelog['rest_hours'] = daily_gamelog['diff_days'] / \
+        np.timedelta64(1, 'h')
+    # fillna with mean of the group
+    # https://stackoverflow.com/a/53339320
+    # me queda alguna duda de como funciona pero anda
+    daily_gamelog['rest_hours'] = daily_gamelog['rest_hours'].fillna(
+        daily_gamelog.groupby('playerId')['rest_hours'].transform('mean'))
+    # removing outliers because of season change, long injury, etc
+    daily_gamelog['rest_hours'] = np.where(
+        daily_gamelog['rest_hours'] > 100, 100, daily_gamelog['rest_hours'])
+
     return daily_gamelog
 
 
-def simulate_from_posterior_sample(posterior, truth, avg_minutes):
+def simulate_from_posterior_sample(posterior, truth, avg_minutes, teams):
 
     identifier = truth.loc[:, ['playerId',
                                'gameId', 'teamId']].reset_index(drop=True)
+
+    teams = teams.loc[:, ['teamId', 'abbreviation']]
 
     # - transponemos samples, renombramos y agregamos minutos promedio por jugador
     # loop pero hay un solo value en el dict. Me resulto util para usarlo pero no hay   una iteracion # real
@@ -202,6 +234,9 @@ def simulate_from_posterior_sample(posterior, truth, avg_minutes):
     # posterior_team_long.head()
     posterior_team_long['match_id'] = posterior_team_long.index
 
+    posterior_team_long = posterior_team_long.merge(
+        teams, how='left', on="teamId")
+
     # sns.displot(
     #     posterior_team_long[posterior_team_long['gameId'] == 53038], x="points",  hue="teamId")
 
@@ -213,7 +248,7 @@ def simulate_from_posterior_sample(posterior, truth, avg_minutes):
     posterior_team_winners = posterior_team_long.iloc[winner_sample.reset_index(
     ).match_id, :]
     posterior_team_winners_pct = posterior_team_winners.groupby(
-        ['gameId', 'teamId']).size().reset_index(name='n_won')
+        ['gameId', 'teamId', 'abbreviation']).size().reset_index(name='n_won')
 
     posterior_team_winners_pct['pct_win'] = posterior_team_winners_pct['n_won'] / \
         len(posterior_team_long['sample'].unique())
