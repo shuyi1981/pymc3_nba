@@ -21,6 +21,8 @@ def main():
         with open(file) as jsonfile:
             data = json.load(jsonfile)
 
+        if data is None:
+            continue
         # checks whether there is expected lineups to avoid crash
         has_info = bool(data['teamLineups'][0]['expected']) & bool(data['teamLineups'][1]
                                                                    ['expected'])

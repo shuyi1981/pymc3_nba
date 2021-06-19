@@ -21,17 +21,21 @@ import pickle
 import utils_reg
 
 # LA PAPA. PODES CAMBIAR OTROS SCRIPTS SIN REINICIAR
-%reload_ext autoreload
-%autoreload 2
+from IPython import get_ipython
+ipython = get_ipython()
 
-train_sep = 61972
+if '__IPYTHON__' in globals():
+    ipython.magic('load_ext autoreload')
+    ipython.magic('autoreload 2')
+
+train_sep = 63447
 np.random.seed(35)
 
 waic_section = False
 multiplicative = True
-charts_section = False
-residuals_section = False
-coef_inspection = False
+charts_section = True
+residuals_section = True
+coef_inspection = True
 save_model = True
 
 
@@ -54,7 +58,6 @@ daily_gamelog = daily_gamelog_raw.copy()
 
 daily_gamelog = utils_reg.clean_data_1(daily_gamelog)
 
-
 daily_gamelog['pts_minute'].describe()
 np.log(daily_gamelog.pts_minute+0.1).hist(bins=25)
 daily_gamelog.head()
@@ -68,13 +71,34 @@ players, last_name, num_players = utils_reg.get_player_index(daily_gamelog)
 daily_gamelog = pd.merge(daily_gamelog, players.drop(
     columns="lastName"), on="playerId", how="left")
 
+# daily_gamelog.iloc[0:5000, :].to_csv(
+#     "data/working/daily_gamelog_reduced.csv", index=False)
+
 players.to_csv("data/working/players.csv", index=False)
 
 teams, abb, num_teams = utils_reg.get_team_index(daily_gamelog)
 
 daily_gamelog = utils_reg.feature_engineer_1(daily_gamelog, teams)
-
+# daily_gamelog.to_csv('data/working/debug.csv')
 teams.to_csv("data/working/teams.csv", index=False)
+
+daily_gamelog['rest_hours'].describe()
+daily_gamelog.rest_hours.hist(bins=10)
+
+# daily_gamelog.rest_hours/np.timedelta64(1)
+
+#  tipos = [type(i) for i in daily_gamelog.startTime_date]
+# set(tipos)
+# tipos = [type(i) for i in daily_gamelog['diff']]
+# set(tipos)
+
+# daily_gamelog['diff'] = daily_gamelog.groupby(
+#         'playerId').startTime_date.diff()
+# import datetime
+# daily_gamelog['diff'] = daily_gamelog['diff'].fillna(datetime.timedelta(3))
+
+# daily_gamelog['diff']/np.timedelta64(1,'h')
+# daily_gamelog.loc[daily_gamelog['diff'].apply(lambda x: isinstance(x,float)), :]
 
 # SPLIT TRAIN AND TEST
 
@@ -136,10 +160,12 @@ with pm.Model() as points_minute_model:
     player_index = pm.Data("player_index", player_game)
     opp_team_index = pm.Data("opp_team_index", oppTeam_game)
     athome_var = pm.Data("athome_var", train.atHome)
+    rest_hours_var = pm.Data('rest_hours_var', np.log(train.rest_hours))
     y_shared = pm.Data("y_shared", train.pts_minute)
 
     sigma = pm.Uniform('sigma', lower=0, upper=10)
     home_effect = pm.Normal('home_effect', mu=0, sigma=0.5)
+    rest_hours_effect = pm.Normal('rest_hours_effect', mu=0, sigma=0.2)
     nu = pm.Exponential('nu', 1./10, testval=5.)
     # player specific parameters
     points_players = pm.Normal(
@@ -156,10 +182,13 @@ with pm.Model() as points_minute_model:
     # multiplicative
     if multiplicative:
         players_mu = points_players[player_index]*home_effect ** \
-            athome_var * oppTeamEffect[opp_team_index]
+            athome_var * oppTeamEffect[opp_team_index] * rest_hours_effect ** \
+            rest_hours_var
+
     else:
         players_mu = points_players[player_index] + home_effect * \
-            athome_var + oppTeamEffect[opp_team_index]
+            athome_var + oppTeamEffect[opp_team_index] + rest_hours_effect * \
+            rest_hours_var
 
     # # relation between variables ?
     # pts_minute = pm.StudentT('pts_minute', nu=nu, mu=players_mu,
@@ -176,8 +205,8 @@ if save_model:
     utils_reg.pickle_model(output_path='model\pymc.pkl', model=points_minute_model,
                            trace=trace_points_minute_model)
 
-# with open("model\pymc.pkl", "rb") as input_file:
-#     pymc = pickle.load(input_file)
+with open("model\pymc.pkl", "rb") as input_file:
+    pymc = pickle.load(input_file)
 
 # # LogNormal (ponele)
 # with pm.Model() as points_minute_model:
@@ -231,7 +260,7 @@ with points_minute_model:
 # check players
 # Anthony Davis
 len(list(post_pred.values())[0][0])
-len(list(post_pred_pickle.values())[0][0])
+# len(list(post_pred_pickle.values())[0][0])
 
 
 list(post_pred.values())[0][0][train['i'] == 8].mean()  # 0.69925
@@ -286,6 +315,9 @@ if residuals_section:
     plt.figure(figsize=(8, 60))
     pm.forestplot(trace_points_minute_model, var_names=[
                   'points_players', 'oppTeamEffect'])
+    plt.figure(figsize=(8, 60))
+    pm.forestplot(trace_points_minute_model, var_names=[
+                  'rest_hours_effect'])
 
     # Metrics en training
 
@@ -307,7 +339,7 @@ Cada sample juntarla con playerId, gameId, teamId.
 """
 
 posterior_team_long, winner_sample, posterior_team_winners_pct = utils_reg.simulate_from_posterior_sample(
-    posterior=post_pred, truth=train, avg_minutes=avg_minutes)
+    posterior=post_pred, truth=train, avg_minutes=avg_minutes, teams=teams)
 
 # returns comparison between prediction and truth
 # in this case is using the training data
@@ -380,8 +412,10 @@ if coef_inspection:
 
 # parsed_games = "D:\Data Science\MySportsFeed\python_api\data\parsed\playoffs_games.csv"
 
+with open("model\pymc.pkl", "rb") as input_file:
+    pymc = pickle.load(input_file)
 
-with points_minute_model:
+with pymc['model']:
     pm.set_data(
         {'player_index': test.i.values,
          'opp_team_index': test.oppTeamI.values,
@@ -390,7 +424,7 @@ with points_minute_model:
          }
     )
     posterior = pm.sample_posterior_predictive(
-        trace_points_minute_model, var_names=['pts_minute'])
+        pymc['trace'], var_names=['pts_minute'])
 
 
 # check players
@@ -453,7 +487,7 @@ if residuals_section:
 
 # predecir partidos
 posterior_team_long, winner_sample, posterior_team_winners_pct = utils_reg.simulate_from_posterior_sample(
-    posterior=posterior, truth=test, avg_minutes=avg_minutes)
+    posterior=posterior, truth=test, avg_minutes=avg_minutes, teams=teams)
 
 
 # playoff_parsed_games = "D:\Data Science\MySportsFeed\python_api\data\parsed\playoffs_games.csv"

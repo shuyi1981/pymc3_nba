@@ -6,6 +6,7 @@ from numpy.lib.shape_base import column_stack
 import pandas as pd
 from pathlib import Path
 
+
 def main():
 
     dir = "D:\Data Science\MySportsFeed\python_api\data\\raw\daily_player_gamelogs"
@@ -20,6 +21,14 @@ def main():
         with open(file) as jsonfile:
             data = json.load(jsonfile)
 
+        print(f"file is {file}")
+        if data is None:
+            continue
+        # checks whether there is expected lineups to avoid crash
+        has_info = bool(data['gamelogs'])
+        if has_info == False:
+            continue
+
         # df with all data from a particular file (to be filled)
         json_df = pd.DataFrame()
         # information in is gamelogs dictionary key
@@ -28,16 +37,17 @@ def main():
         for gamelog in data['gamelogs']:
             row = get_game(gamelog).join(get_player(gamelog)).join(get_team(gamelog))\
                 .join(get_fieldgoals(gamelog)).join(get_freethrows(gamelog)).join(get_rebounds(gamelog))\
-                    .join(get_offense(gamelog)).join(get_defense(gamelog)).join(get_miscellaneous(gamelog))
+                .join(get_offense(gamelog)).join(get_defense(gamelog)).join(get_miscellaneous(gamelog))
             json_df = json_df.append(row)
 
         player_gamelog = player_gamelog.append(json_df)
 
-    player_gamelog.to_csv("data/parsed/daily_player_gamelog.csv", index = False)
+    player_gamelog.to_csv("data/parsed/daily_player_gamelog.csv", index=False)
 
 #### Functions ####
 # They extract the necessary data from json keys
 # TODO should I do it in another way? Also put them in another file?
+
 
 def get_game(gamelog):
     """ 
@@ -51,10 +61,11 @@ def get_game(gamelog):
     # Couldn't create the dataframe straight as columns (need an index (?))
     # easiest way was to make it as just one column and then transpose
     # TODO make this in just one step
-    df = pd.DataFrame.from_dict(gamelog['game'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['game'], orient="index")
     df_t = df.transpose()
-    df_t = df_t.rename(columns = {'id':'gameId'})
+    df_t = df_t.rename(columns={'id': 'gameId'})
     return df_t
+
 
 def get_player(gamelog):
     """ 
@@ -66,9 +77,9 @@ def get_player(gamelog):
     - position
     - jersey number
     """
-    df = pd.DataFrame.from_dict(gamelog['player'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['player'], orient="index")
     df_t = df.transpose()
-    df_t = df_t.rename(columns = {'id': 'playerId'})
+    df_t = df_t.rename(columns={'id': 'playerId'})
     return df_t
 
 
@@ -79,10 +90,11 @@ def get_team(gamelog):
     - team id
     - team
     """
-    df = pd.DataFrame.from_dict(gamelog['team'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['team'], orient="index")
     df_t = df.transpose()
-    df_t = df_t.rename(columns = {'id':'teamId'})
+    df_t = df_t.rename(columns={'id': 'teamId'})
     return df_t
+
 
 def get_fieldgoals(gamelog):
     """ 
@@ -94,7 +106,7 @@ def get_fieldgoals(gamelog):
     - madepgame (same as made?)
     - pct
     """
-    df = pd.DataFrame.from_dict(gamelog['stats']['fieldGoals'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['stats']['fieldGoals'], orient="index")
     df_t = df.transpose()
     return df_t
 
@@ -109,9 +121,10 @@ def get_freethrows(gamelog):
     - madepgame (same as made?)
     - pct
     """
-    df = pd.DataFrame.from_dict(gamelog['stats']['freeThrows'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['stats']['freeThrows'], orient="index")
     df_t = df.transpose()
     return df_t
+
 
 def get_rebounds(gamelog):
     """ 
@@ -124,9 +137,10 @@ def get_rebounds(gamelog):
     - reb
     - rebpgame
     """
-    df = pd.DataFrame.from_dict(gamelog['stats']['rebounds'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['stats']['rebounds'], orient="index")
     df_t = df.transpose()
     return df_t
+
 
 def get_offense(gamelog):
     """ 
@@ -137,9 +151,10 @@ def get_offense(gamelog):
     - points
     - pointspgame (same as points?)
     """
-    df = pd.DataFrame.from_dict(gamelog['stats']['offense'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['stats']['offense'], orient="index")
     df_t = df.transpose()
     return df_t
+
 
 def get_defense(gamelog):
     """ 
@@ -154,7 +169,7 @@ def get_defense(gamelog):
     - blk against
     - blk againstpgame
     """
-    df = pd.DataFrame.from_dict(gamelog['stats']['defense'], orient = "index")
+    df = pd.DataFrame.from_dict(gamelog['stats']['defense'], orient="index")
     df_t = df.transpose()
     return df_t
 
@@ -163,9 +178,11 @@ def get_miscellaneous(gamelog):
     """ 
     Returns a dataframe with other info such as fouls, ejections, starter, time played, plusminus.
     """
-    df = pd.DataFrame.from_dict(gamelog['stats']['miscellaneous'], orient = "index")
+    df = pd.DataFrame.from_dict(
+        gamelog['stats']['miscellaneous'], orient="index")
     df_t = df.transpose()
     return df_t
+
 
 # In the end for the get functions to be read
 if __name__ == "__main__":

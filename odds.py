@@ -66,6 +66,16 @@ def is_there_value(df, win_pct, odd):
     return bet
 
 
+def is_there_much_value(df, win_pct, odd):
+    """
+    if implicit even odd is lower than actual odd
+    then there is value.
+    Flag Bet.
+    """
+    bet = np.where(1/(df[win_pct]+0.1) < df[odd], 1, 0)
+    return bet
+
+
 def returns(df):
     """
     Calculate returns per observation
@@ -79,10 +89,15 @@ def returns(df):
 
 
 predictions['bet'] = is_there_value(predictions, 'pct_win', 'decimal')
+predictions['bet'] = is_there_much_value(predictions, 'pct_win', 'decimal')
+
 
 predictions['earning'] = predictions.apply(returns, axis=1)
 
 predictions.earning.sum()
+predictions.bet.sum()
+
+predictions.earning.sum()/predictions.bet.sum()
 
 predictions.loc[predictions.earning > 0, :]
 predictions.loc[predictions.earning < 0, :]
@@ -101,7 +116,8 @@ graph = sns.scatterplot(x=aa.pct_win.apply(left_bound), y=aa.actual_win)
 
 bins = 11
 predictions.groupby(pd.cut(predictions.pct_win, bins)).aggregate(
-    {'earning': 'sum'}).reset_index()
+    {'earning': 'sum',
+     'bet': 'sum'}).reset_index()
 
 
 bb = utils_reg.bin_results(predictions[predictions.earning > 0], 11)

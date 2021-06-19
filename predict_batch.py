@@ -8,8 +8,14 @@ import parse_game_lineup
 import os
 import re
 
+# LA PAPA. PODES CAMBIAR OTROS SCRIPTS SIN REINICIAR
+%reload_ext autoreload
+%autoreload 2
+
+
+os.chdir("D:\Data Science\MySportsFeed\python_api")
 # dates to import
-dates_to_import = ['20210227', '20210228']
+dates_to_import = ['20210331', "20210401"]
 pattern = '|'.join(dates_to_import)
 
 # import model
@@ -66,11 +72,13 @@ lineup2['atHome'] = np.where(
     lineup2['abbreviation'] == lineup2['homeTeamAbbreviation'], 1, 0)
 
 lineup3 = lineup2.merge(players, left_on='id', right_on='playerId', how="left")
-# TODO add fix when player was not used in training (add index to max index possible)
+lineup3['i'] = np.where(lineup3['i'].isnull(),
+                        608., lineup3['i'])  # add fix when player was not used in training (add index to max index possible)
+
 
 with pymc['model']:
     pm.set_data(
-        {'player_index': lineup3.i.values,
+        {'player_index': np.array(lineup3.i.values, dtype=np.int32),
          'opp_team_index': lineup3.oppTeamI.values,
          'athome_var': lineup3.atHome,
          'y_shared': np.zeros(lineup3.shape[0])
@@ -81,5 +89,7 @@ with pymc['model']:
 
 
 posterior_team_long, winner_sample, posterior_team_winners_pct = utils_reg.simulate_from_posterior_sample(
-    posterior=posterior, truth=lineup3, avg_minutes=avg_minutes)
+    posterior=posterior, truth=lineup3, avg_minutes=avg_minutes, teams=teams)
 # TODO add fix when player was not used in training and doesn't have average minutes (add index to max index possible)
+posterior_team_winners_pct['min_odd_needed'] = 1 / \
+    posterior_team_winners_pct['pct_win']

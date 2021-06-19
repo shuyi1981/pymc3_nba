@@ -13,6 +13,7 @@ for file in pathlist:
     with open(file) as jsonfile:
         data = json.load(jsonfile)
 
+    print(f"file is {file}")
     # inspect
     data.keys()
     data['references'].keys()

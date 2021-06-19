@@ -16,8 +16,8 @@ format = "json"
 feed = "daily_player_gamelogs"
 output = "data\\raw\\"
 max_tries = 5
-startdate = '2021-02-13'
-enddate = '2021-02-14'
+startdate = '2021-03-30'
+enddate = '2021-06-19'
 
 """ 
 This feed must be downloaded by date and not by game id
@@ -52,13 +52,20 @@ for date in dates_to_download:
             try:
                 data = get_data(version=version, league=league, season=season,
                                 feed=feed, format=format, api=msf, date=date)
-                status = "downloaded"
+                has_info = bool(data['gamelogs'][0])
+                if has_info:
+                    status = "downloaded"
+                else:
+                    status = "failed"
                 trial = max_tries
+                # status = "downloaded"
+                # trial = max_tries
             except:
                 print(date)
                 status = "failed"
                 trial = trial + 1
                 time.sleep(1)
+                data = None
 
         with open(output + feed + "\\" + 'log.csv', 'a') as fp:
             fp.write("{date},{status}\n".format(date=date, status=status))

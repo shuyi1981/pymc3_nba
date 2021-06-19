@@ -60,7 +60,12 @@ for game, gameName in zip(to_download.id, to_download.gameName):
             try:
                 data = get_data(version=version, league=league, season=season,
                                 feed=feed, format=format, api=msf, game=game)
-                status = "downloaded"
+                has_info = bool(data['teamLineups'][0]['expected']) & bool(data['teamLineups'][1]
+                                                                           ['expected'])
+                if has_info:
+                    status = "downloaded"
+                else:
+                    status = "failed"
                 trial = max_tries
             except:
                 print(game, gameName)
