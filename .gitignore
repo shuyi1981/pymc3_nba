@@ -1,5 +1,7 @@
 /model
 /data
+/pinnacle/cred.txt
+/online_results/*.csv
 
 .ipynb_checkpoints
 __pycache__

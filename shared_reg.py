@@ -85,20 +85,6 @@ teams.to_csv("data/working/teams.csv", index=False)
 daily_gamelog['rest_hours'].describe()
 daily_gamelog.rest_hours.hist(bins=10)
 
-# daily_gamelog.rest_hours/np.timedelta64(1)
-
-#  tipos = [type(i) for i in daily_gamelog.startTime_date]
-# set(tipos)
-# tipos = [type(i) for i in daily_gamelog['diff']]
-# set(tipos)
-
-# daily_gamelog['diff'] = daily_gamelog.groupby(
-#         'playerId').startTime_date.diff()
-# import datetime
-# daily_gamelog['diff'] = daily_gamelog['diff'].fillna(datetime.timedelta(3))
-
-# daily_gamelog['diff']/np.timedelta64(1,'h')
-# daily_gamelog.loc[daily_gamelog['diff'].apply(lambda x: isinstance(x,float)), :]
 
 # SPLIT TRAIN AND TEST
 
@@ -203,7 +189,8 @@ with pm.Model() as points_minute_model:
 if save_model:
 
     utils_reg.pickle_model(output_path='model\pymc.pkl', model=points_minute_model,
-                           trace=trace_points_minute_model)
+                           trace=trace_points_minute_model,
+                           train=train)
 
 with open("model\pymc.pkl", "rb") as input_file:
     pymc = pickle.load(input_file)

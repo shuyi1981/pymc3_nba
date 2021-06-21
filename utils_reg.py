@@ -272,7 +272,10 @@ def mape(pred, true):
     return MAPE
 
 
-def pickle_model(output_path: str, model, trace):
+def pickle_model(output_path: str, model, trace, train):
     """Pickles PyMC3 model and trace"""
     with open(output_path, "wb") as buff:
-        pickle.dump({"model": model, "trace": trace}, buff)
+        pickle.dump({
+        "model": model, 
+        "trace": trace,
+        "train": train}, buff)
